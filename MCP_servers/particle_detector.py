@@ -1,5 +1,4 @@
 # /// script
-# requires-python = ">=3.12"
 # dependencies = [
 #     "mcp[cli]>=1.12.3",
 #     "pydantic>=2.11.7",

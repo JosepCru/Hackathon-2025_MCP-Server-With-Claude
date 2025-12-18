@@ -22,6 +22,8 @@ import json
 import os
 import requests
 import sys
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 mcp = FastMCP("STEMMicroscope")
 
@@ -32,8 +34,22 @@ _current_data = {
     "locations": [],
     "overview_image": None,
     "pca_results": None,
-    "clusters": None
+    "clusters": None,
+    "saved_images": []  # Track all saved images
 }
+
+# Create output directory for images
+OUTPUT_DIR = "stem_analysis_images"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+def _save_image_info(filepath: str, description: str):
+    """Track saved images"""
+    _current_data["saved_images"].append({
+        "filepath": filepath,
+        "description": description,
+        "timestamp": datetime.now().isoformat()
+    })
 
 def _get_microscope_connection(uri: str = "PYRO:microscope.server@localhost:9091"):
     """Get or create microscope server connection"""
@@ -174,7 +190,24 @@ def get_overview_image() -> str:
         im_array = np.array(array_list, dtype=dtype).reshape(shape)
         _current_data["overview_image"] = im_array
         
-        return f"Overview image retrieved successfully.\nShape: {shape}\nDtype: {dtype}\nImage stored in memory for analysis."
+        # Save the image
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(OUTPUT_DIR, f"overview_image_{timestamp}.png")
+        
+        plt.figure(figsize=(10, 8))
+        plt.imshow(im_array, cmap='gray')
+        plt.colorbar(label='Intensity')
+        plt.title('Overview Image')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        _save_image_info(filepath, "Overview image from microscope")
+        
+        abs_path = os.path.abspath(filepath)
+        return f"Overview image retrieved successfully.\nShape: {shape}\nDtype: {dtype}\nImage stored in memory for analysis.\n\n📸 Image saved to: {abs_path}"
     except Exception as e:
         return f"Error getting overview image: {str(e)}"
 
@@ -196,7 +229,24 @@ def get_point_spectrum(x: int, y: int, channel: str = "Channel_001") -> str:
         array_list, shape, dtype = mic_server.get_point_data(channel, x, y)
         spectrum = np.array(array_list, dtype=dtype).reshape(shape)
         
-        return f"Spectrum retrieved from point ({x}, {y}).\nShape: {shape}\nDtype: {dtype}\nSpectrum length: {len(spectrum.flatten())}"
+        # Save spectrum plot
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(OUTPUT_DIR, f"spectrum_point_{x}_{y}_{timestamp}.png")
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(spectrum.flatten())
+        plt.title(f'Spectrum at Point ({x}, {y})')
+        plt.xlabel('Energy Channel')
+        plt.ylabel('Intensity')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        _save_image_info(filepath, f"Spectrum from point ({x}, {y})")
+        
+        abs_path = os.path.abspath(filepath)
+        return f"Spectrum retrieved from point ({x}, {y}).\nShape: {shape}\nDtype: {dtype}\nSpectrum length: {len(spectrum.flatten())}\n\n📸 Spectrum plot saved to: {abs_path}"
     except Exception as e:
         return f"Error getting spectrum: {str(e)}"
 
@@ -234,8 +284,34 @@ def collect_grid_spectra(
         _current_data["spectra"] = np.array(spectra)
         _current_data["locations"] = locations
         
+        # Save grid collection visualization
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(OUTPUT_DIR, f"grid_collection_{grid_size_x}x{grid_size_y}_{timestamp}.png")
+        
+        # Create a visualization showing sample spectra
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle(f'Grid Collection: {grid_size_x}x{grid_size_y} points', fontsize=14)
+        
+        # Plot 4 sample spectra from different positions
+        sample_indices = [0, len(spectra)//3, 2*len(spectra)//3, len(spectra)-1]
+        for idx, ax in enumerate(axes.flat):
+            spec_idx = sample_indices[idx]
+            loc = locations[spec_idx]
+            ax.plot(spectra[spec_idx])
+            ax.set_title(f'Point ({loc[0]}, {loc[1]})')
+            ax.set_xlabel('Energy Channel')
+            ax.set_ylabel('Intensity')
+            ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        _save_image_info(filepath, f"Grid collection {grid_size_x}x{grid_size_y} sample spectra")
+        
         total_points = grid_size_x * grid_size_y
-        return f"Collected {total_points} spectra from {grid_size_x}x{grid_size_y} grid.\nSpectra shape: {_current_data['spectra'].shape}\nData stored in memory for analysis."
+        abs_path = os.path.abspath(filepath)
+        return f"Collected {total_points} spectra from {grid_size_x}x{grid_size_y} grid.\nSpectra shape: {_current_data['spectra'].shape}\nData stored in memory for analysis.\n\n📸 Sample spectra visualization saved to: {abs_path}"
     except Exception as e:
         return f"Error collecting spectra: {str(e)}"
 
@@ -262,11 +338,56 @@ def perform_pca_analysis(n_components: int = 2) -> str:
         
         explained_variance = pca.explained_variance_ratio_
         
+        # Save PCA visualization
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if n_components == 2:
+            # 2D scatter plot
+            filepath = os.path.join(OUTPUT_DIR, f"pca_analysis_{n_components}components_{timestamp}.png")
+            
+            plt.figure(figsize=(10, 8))
+            plt.scatter(data_pca[:, 0], data_pca[:, 1], alpha=0.6, s=50)
+            plt.xlabel(f'PC1 ({explained_variance[0]:.2%} variance)')
+            plt.ylabel(f'PC2 ({explained_variance[1]:.2%} variance)')
+            plt.title(f'PCA Analysis - {n_components} Components')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            _save_image_info(filepath, f"PCA scatter plot ({n_components} components)")
+        else:
+            # Multiple component visualization
+            filepath = os.path.join(OUTPUT_DIR, f"pca_analysis_{n_components}components_{timestamp}.png")
+            
+            n_plots = min(n_components, 4)
+            fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+            fig.suptitle(f'PCA Analysis - First {n_plots} Components', fontsize=14)
+            
+            for idx, ax in enumerate(axes.flat):
+                if idx < n_components:
+                    ax.hist(data_pca[:, idx], bins=30, alpha=0.7)
+                    ax.set_title(f'PC{idx+1} ({explained_variance[idx]:.2%} variance)')
+                    ax.set_xlabel('Value')
+                    ax.set_ylabel('Frequency')
+                    ax.grid(True, alpha=0.3)
+                else:
+                    ax.axis('off')
+            
+            plt.tight_layout()
+            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            _save_image_info(filepath, f"PCA component distributions ({n_components} components)")
+        
         result = f"PCA completed successfully.\n"
         result += f"Reduced from {_current_data['spectra'].shape[1]} to {n_components} dimensions.\n"
         result += f"PCA shape: {data_pca.shape}\n"
         result += f"Explained variance ratio: {explained_variance}\n"
-        result += f"Total variance explained: {sum(explained_variance):.2%}"
+        result += f"Total variance explained: {sum(explained_variance):.2%}\n"
+        
+        abs_path = os.path.abspath(filepath)
+        result += f"\n📸 PCA visualization saved to: {abs_path}"
         
         return result
     except Exception as e:
@@ -312,6 +433,88 @@ def perform_clustering(
         for i in range(n_clusters):
             cluster_counts[f"Cluster {i}"] = int(np.sum(clusters == i))
         
+        # Save clustering visualization
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(OUTPUT_DIR, f"clustering_{n_clusters}clusters_{timestamp}.png")
+        
+        fig = plt.figure(figsize=(14, 6))
+        
+        # Left plot: Scatter plot if using PCA with 2 components
+        if use_pca and data.shape[1] >= 2:
+            ax1 = plt.subplot(1, 2, 1)
+            scatter = ax1.scatter(data[:, 0], data[:, 1], c=clusters, cmap='viridis', 
+                                alpha=0.6, s=50, edgecolors='black', linewidth=0.5)
+            ax1.set_xlabel('PC1')
+            ax1.set_ylabel('PC2')
+            ax1.set_title(f'K-means Clustering ({n_clusters} clusters)')
+            ax1.grid(True, alpha=0.3)
+            plt.colorbar(scatter, ax=ax1, label='Cluster')
+        else:
+            ax1 = plt.subplot(1, 2, 1)
+            ax1.text(0.5, 0.5, 'Clustering performed\non high-dimensional data', 
+                    ha='center', va='center', fontsize=12)
+            ax1.set_xlim(0, 1)
+            ax1.set_ylim(0, 1)
+            ax1.axis('off')
+        
+        # Right plot: Cluster distribution bar chart
+        ax2 = plt.subplot(1, 2, 2)
+        cluster_ids = list(range(n_clusters))
+        counts = [cluster_counts[f"Cluster {i}"] for i in cluster_ids]
+        bars = ax2.bar(cluster_ids, counts, color=plt.cm.viridis(np.linspace(0, 1, n_clusters)))
+        ax2.set_xlabel('Cluster ID')
+        ax2.set_ylabel('Number of Points')
+        ax2.set_title('Cluster Distribution')
+        ax2.set_xticks(cluster_ids)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Add count labels on bars
+        for bar, count in zip(bars, counts):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{count}', ha='center', va='bottom')
+        
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        _save_image_info(filepath, f"K-means clustering ({n_clusters} clusters)")
+        
+        # Also save spatial map if we have locations
+        if len(_current_data["locations"]) > 0 and _current_data["overview_image"] is not None:
+            filepath_map = os.path.join(OUTPUT_DIR, f"clustering_spatial_map_{n_clusters}clusters_{timestamp}.png")
+            
+            # Create spatial cluster map
+            grid_x = max([loc[0] for loc in _current_data["locations"]]) + 1
+            grid_y = max([loc[1] for loc in _current_data["locations"]]) + 1
+            cluster_map = np.zeros((grid_x, grid_y))
+            
+            for idx, (x, y) in enumerate(_current_data["locations"]):
+                cluster_map[x, y] = clusters[idx]
+            
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            
+            # Overview image
+            im1 = ax1.imshow(_current_data["overview_image"], cmap='gray')
+            ax1.set_title('Overview Image')
+            ax1.set_xlabel('X')
+            ax1.set_ylabel('Y')
+            plt.colorbar(im1, ax=ax1, label='Intensity')
+            
+            # Cluster map
+            im2 = ax2.imshow(cluster_map.T, cmap='viridis', interpolation='nearest')
+            ax2.set_title(f'Spatial Cluster Map ({n_clusters} clusters)')
+            ax2.set_xlabel('X')
+            ax2.set_ylabel('Y')
+            plt.colorbar(im2, ax=ax2, label='Cluster ID')
+            
+            plt.tight_layout()
+            plt.savefig(filepath_map, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            _save_image_info(filepath_map, f"Spatial cluster map ({n_clusters} clusters)")
+            abs_path_map = os.path.abspath(filepath_map)
+        
         result = f"K-means clustering completed successfully.\n"
         result += f"Data used: {data_type}\n"
         result += f"Number of clusters: {n_clusters}\n"
@@ -319,6 +522,12 @@ def perform_clustering(
         result += f"\nCluster distribution:\n"
         for cluster, count in cluster_counts.items():
             result += f"  {cluster}: {count} samples\n"
+        
+        abs_path = os.path.abspath(filepath)
+        result += f"\n📸 Clustering visualization saved to: {abs_path}"
+        
+        if len(_current_data["locations"]) > 0 and _current_data["overview_image"] is not None:
+            result += f"\n📸 Spatial cluster map saved to: {abs_path_map}"
         
         return result
     except Exception as e:
@@ -362,9 +571,19 @@ def get_analysis_summary() -> str:
         n_clusters = len(np.unique(_current_data["clusters"]))
         summary += f"Clustering Results:\n"
         summary += f"  - Number of clusters: {n_clusters}\n"
-        summary += f"  - Samples clustered: {len(_current_data['clusters'])}\n"
+        summary += f"  - Samples clustered: {len(_current_data['clusters'])}\n\n"
     else:
-        summary += "Clustering Results: Not performed\n"
+        summary += "Clustering Results: Not performed\n\n"
+    
+    # Saved images
+    if len(_current_data["saved_images"]) > 0:
+        summary += f"📸 Saved Images ({len(_current_data['saved_images'])} total):\n"
+        for img_info in _current_data["saved_images"]:
+            summary += f"  - {img_info['description']}\n"
+            summary += f"    Path: {os.path.abspath(img_info['filepath'])}\n"
+            summary += f"    Time: {img_info['timestamp']}\n"
+    else:
+        summary += "📸 Saved Images: None\n"
     
     return summary
 
@@ -415,8 +634,9 @@ def reset_analysis() -> str:
     _current_data["overview_image"] = None
     _current_data["pca_results"] = None
     _current_data["clusters"] = None
+    _current_data["saved_images"] = []
     
-    return "All analysis data has been reset. Ready for new analysis."
+    return "All analysis data has been reset. Ready for new analysis.\n\n(Note: Previously saved image files in the 'stem_analysis_images' folder have NOT been deleted)"
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

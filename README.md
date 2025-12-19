@@ -27,7 +27,7 @@ We created **three MCP servers** that translate complex microscopy operations in
 
 ### 👥 Team
 
-- **Josep Cru** - [@JosepCru](https://github.com/JosepCru)
+- **Josep Cruañes** - [@JosepCru](https://github.com/JosepCru)
 - **Fanzhi Su**
 
 ---

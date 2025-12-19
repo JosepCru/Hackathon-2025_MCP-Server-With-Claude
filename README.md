@@ -4,7 +4,7 @@
 
 **Control STEM & AFM Digital Twins through Natural Language using Claude and MCP**
 
-[Overview](#-overview) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Architecture](#-architecture) • [Troubleshooting](#-troubleshooting)
+[Overview](#-overview) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) 
 
 </div>
 

@@ -285,7 +285,6 @@ Claude: I'll load the segmentation model and analyze the image...
 [Processes image]
 [Generates side-by-side visualization]
 Results saved to: segmentation_results/segmentation_20250119_143022.png
-Detected 47 particles in the image.
 ```
 
 ⚠️ **Note:** The segmentation server currently has some compatibility issues with Claude Desktop. We're investigating the root cause.
@@ -327,28 +326,6 @@ Detected 47 particles in the image.
 │  (test_stem.h5, dset_spm1.h5)  │
 └─────────────────────────────────┘
 ```
-
-### Technology Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **MCP Servers** | Python 3.12 + FastMCP / MCP SDK | Bridge between Claude and instruments |
-| **Communication** | Pyro5 (Python Remote Objects) | RPC for digital twin servers |
-| **Data Format** | HDF5 (.h5 files) | Scientific data storage |
-| **Analysis** | NumPy, scikit-learn | Data processing & ML |
-| **Visualization** | Matplotlib | Generate analysis plots |
-| **Segmentation** | PyTorch | Deep learning model inference |
-| **Transport** | stdio | MCP protocol communication |
-
----
-
-## 🔧 Technical Details
-
-### STEM MCP Server (`stem_mcp_server.py`)
-
-**Transport:** stdio  
-**Framework:** FastMCP  
-**Pyro5 URI:** `PYRO:microscope.server@localhost:9091`
 
 **Available Tools:**
 
@@ -394,7 +371,7 @@ Detected 47 particles in the image.
 - Amplitude (Trace/Retrace)
 - Phase (Trace/Retrace)
 
-### Particle Segmentation MCP Server (`particle_detection_mcp.py`)
+### Segmentation MCP Server (`particle_detection_mcp.py`)
 
 **Transport:** stdio  
 **Framework:** FastMCP  
@@ -416,124 +393,13 @@ Detected 47 particles in the image.
 
 ---
 
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Issue 1: "Failed to connect to Pyro5 server"
-
-**Symptoms:**
-```
-❌ Failed to connect to STEM/AFM server: [Errno 61] Connection refused
-Make sure 'run_server_stem' or 'run_server_afm' is running!
-```
-
-**Solutions:**
-1. Verify the appropriate Pyro5 server is running:
-   ```bash
-   # Check if server is running
-   lsof -i :9091  # For STEM
-   lsof -i :9092  # For AFM
-   ```
-
-2. Start the server if not running:
-   ```bash
-   python run_server_stem.py  # For STEM
-   python run_server_afm.py   # For AFM
-   ```
-
-3. Check firewall settings allow localhost connections
-
-#### Issue 2: "MCP server not appearing in Claude"
-
-**Solutions:**
-1. Verify configuration file path is correct
-2. Ensure you used **absolute paths** in the config
-3. Completely quit and restart Claude Desktop (not just close the window)
-4. Check Claude Desktop logs:
-   ```bash
-   # macOS
-   tail -f ~/Library/Logs/Claude/mcp*.log
-   
-   # Windows
-   type %APPDATA%\Claude\logs\mcp-server-*.log
-   ```
-
-#### Issue 3: "File not found" errors
-
-**Solutions:**
-1. Use absolute paths for H5 files:
-   ```python
-   # ❌ Bad
-   "test_stem.h5"
-   
-   # ✅ Good
-   "/Users/username/hackathon/data/test_stem.h5"
-   ```
-
-2. Verify file exists:
-   ```bash
-   ls -la /path/to/file.h5
-   ```
-
-#### Issue 4: Particle Segmentation not working
-
-**Current Status:** Under investigation 🔍
-
-**Possible causes:**
-- Model loading timeout
-- Memory issues with large models
-- FastMCP compatibility with PyTorch
-- File path issues with model loading
-
-**Workaround:**
-Use the STEM and AFM servers for now. The segmentation functionality can be accessed directly via the Python script if needed.
-
-#### Issue 5: "Module not found" errors
-
-**Solution:**
-The inline script metadata should handle dependencies automatically. If you see import errors:
-
-```bash
-# Manually install dependencies
-pip install mcp[cli]>=1.12.3 Pyro5>=5.14 numpy>=1.24.0 scikit-learn>=1.3.0 matplotlib>=3.7.2
-```
-
-### Debug Mode
-
-Enable verbose logging in the MCP servers by checking stderr output:
-
-```python
-# The servers write debug info to stderr
-print(f"Debug: {info}", file=sys.stderr)
-```
-
-View in Claude Desktop logs to see detailed execution traces.
-
----
-
 ## 📚 Additional Resources
 
 ### Hackathon Resources
 
-- **Official Website:** [AI and ML for Microscopy Hackathon](https://microscopy-hackathon.org/)
+- **Official Website:** [AI and ML for Microscopy Hackathon](https://kaliningroup.github.io/mic_hackathon_2/)
 - **H5 Data Files:** Provided by hackathon organizers
 - **Pyro5 Servers:** `run_server_stem.py`, `run_server_afm.py` (from hackathon)
-
-### MCP Protocol
-
-- [Model Context Protocol Specification](https://spec.modelcontextprotocol.io)
-- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
-- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
-- [Claude MCP Integration Guide](https://docs.anthropic.com/en/docs/build-with-claude/mcp)
-
-### Scientific Computing
-
-- [HDF5 Format](https://www.hdfgroup.org/solutions/hdf5/)
-- [Pyro5 Documentation](https://pyro5.readthedocs.io/)
-- [NumPy](https://numpy.org/)
-- [scikit-learn](https://scikit-learn.org/)
-
 ---
 
 ## 🎓 What We Learned
@@ -546,28 +412,13 @@ This project demonstrates several key concepts:
 
 3. **Compositional AI Tools**: Claude can chain multiple tool calls together, enabling complex workflows like "download → initialize → scan → analyze → visualize" from a single request.
 
-4. **Rapid Prototyping**: MCP's simplicity allowed us to build three functional servers during the hackathon timeframe.
+4. **Rapid Prototyping**: MCP's simplicity allowed us to build two functional servers during the hackathon timeframe.
 
 5. **Challenges with Complex Dependencies**: The segmentation server highlighted potential issues when integrating heavy ML frameworks (PyTorch) with MCP.
 
----
-
-## 🚧 Future Improvements
-
-- [ ] Fix particle segmentation server compatibility issues
-- [ ] Add real-time progress indicators for long-running operations
-- [ ] Implement caching for frequently-accessed data
-- [ ] Add batch processing capabilities
-- [ ] Create web-based visualization dashboard
-- [ ] Support for more microscopy file formats
-- [ ] Integration with additional analysis libraries
-- [ ] Add automated report generation
-
----
-
 ## 🙏 Acknowledgments
 
-- **Hackathon Organizers** at [Microscopy Hackathon](https://microscopy-hackathon.org/) for providing the digital twin servers and data
+- **Hackathon Organizers** at [Microscopy Hackathon](https://kaliningroup.github.io/mic_hackathon_2/) for providing the digital twin servers and data
 - **Anthropic** for Claude and the Model Context Protocol
 - **Python Scientific Computing Community** for the excellent tools (NumPy, scikit-learn, Matplotlib)
 - **FastMCP** developers for the simplified MCP server framework
@@ -581,8 +432,6 @@ This project demonstrates several key concepts:
 - Fanzhi Su
 
 **Project Repository:** [github.com/JosepCru/Hackathon-2025_MCP-Server-With-Claude](https://github.com/JosepCru/Hackathon-2025_MCP-Server-With-Claude)
-
-**Hackathon:** [AI and ML for Microscopy Hackathon](https://microscopy-hackathon.org/)
 
 ---
 

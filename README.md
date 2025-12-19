@@ -426,7 +426,7 @@ This project demonstrates several key concepts:
 ## 📞 Contact & Links
 
 **Team Members:**
-- Josep Cru - [@JosepCru](https://github.com/JosepCru)
+- Josep Cruañes - [@JosepCru](https://github.com/JosepCru)
 - Fanzhi Su
 
 **Project Repository:** [github.com/JosepCru/Hackathon-2025_MCP-Server-With-Claude](https://github.com/JosepCru/Hackathon-2025_MCP-Server-With-Claude)
